@@ -13,7 +13,7 @@ struct PSO{
     double c2 = 1.0;    //社会学习因子
     double gBestF;      //全局最优适应度
     double temp = 1.0;  //模拟退火温度
-    double dt = 0.9;  //降温速率
+    double dt = 0.999;  //降温速率
     struct Particle{        //粒子
         vector<int>p;       //哈密顿路径
         vector<int>bestP;   //历史最优位置
