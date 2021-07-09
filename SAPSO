@@ -1,0 +1,125 @@
+#include<bits/stdc++.h>
+using namespace std;
+
+struct PSO{
+    using pii = pair<int,int>;
+    int N = 365;      //粒子数
+    int gTimes = 2048;//迭代次数
+    int cityNum = 64; //城市数
+    double w  = 0.5;    //惯性因子
+    double c1 = 1.0;    //个体学习因子
+    double c2 = 1.0;    //社会学习因子
+    double gBestF;      //全局最优适应度
+    double temp = 1.0;  //模拟退火温度
+    double dt = 0.999;  //降温速率
+    struct Particle{        //粒子
+        vector<int>p;       //哈密顿路径
+        vector<int>bestP;   //历史最优位置
+        vector<pii>v;       //交换序列作为速度
+        double bestF;       //个体最优适应度
+        double f;           //适应度
+    };
+    vector<Particle>particles;  //粒子群
+    vector<pii>exchangeSeg;     //交换序列
+    vector<vector<int>>cities; //距离矩阵
+    vector<int> gBestP;         //全局最优位置
+    inline double rand01(){return (rand()%1000)/1000.0;}//0~1随机浮点数
+    inline double getFitness(const vector<int>& path){ //距离和
+        double lenSum = 0;
+        for(int i=0;i<cityNum;++i)lenSum += cities[path[i]][path[(i+1)%cityNum]];
+        return lenSum;
+    }
+    PSO(){  //构造函数
+        cityNum = 48;
+        freopen("input.in","r",stdin);
+        for(int i=0,tmp=0;i<cityNum;++i){
+            vector<int>tp;
+            for(int j=0;j<cityNum;++j)cin>>tmp,tp.push_back(tmp);
+            cities.push_back(tp);
+        }
+        for(int i=0;i<cityNum;++i)gBestP.push_back(i);
+        unsigned seed = chrono::system_clock::now().time_since_epoch().count();
+        shuffle(gBestP.begin(),gBestP.end(),default_random_engine(seed));
+        gBestF = getFitness(gBestP);
+
+        for(int t=0;t<N;++t){
+            Particle p;
+            //初始化路径
+            for(int i=0;i<cityNum;++i)p.p.push_back(i);
+            unsigned seed = chrono::system_clock::now().time_since_epoch().count();
+            shuffle(p.p.begin(),p.p.end(),default_random_engine(seed));
+            p.bestP = p.p;
+            //初始化交换序列
+            int cnt = rand()%cityNum;
+            for(int i=0;i<cnt;++i){
+                int u = rand()%cityNum;
+                int v = rand()%(cityNum-1);
+                if(v>=u)++v;
+                p.v.push_back(pii(u,v));
+            }
+            p.bestF = getFitness(p.p);
+            particles.emplace_back(p);
+        }
+    }
+    /** 求 u-v 的交换序列 */
+    vector<pii> pSub(const vector<int>& u,const vector<int>& v){
+        vector<pii> q;
+        vector<int> t(v.begin(),v.end());
+        for(int i=0;i<cityNum;++i)if(u[i]!=t[i]){
+            int index = find(t.begin(),t.end(),u[i])-t.begin();
+            swap(t[i],t[index]);
+            q.emplace_back(pii(i,index));
+        }
+        return q;
+    }
+    /** 更新速度 */
+    void updateV(Particle &p){
+        vector<pii>v,a,b;
+        //保持惯性
+        int cnt = (int)(w*p.v.size());
+        for(int i=0;i<cnt;++i)v.push_back(p.v[i]);
+        //自我认知
+        a = pSub(p.bestP,p.p);
+        cnt = (int)(c1*rand01()*a.size());
+        for(int i=0;i<cnt;++i)v.push_back(a[i]);
+        //社会认知
+        b = pSub(gBestP,p.p);
+        cnt = (int)(c2*rand01()*b.size());
+        for(int i=0;i<cnt;++i)v.push_back(b[i]);
+        //概率接受
+        Particle nextP;
+        nextP.p = p.p;
+        nextP.v = v;
+        updateP(nextP);
+        double df = getFitness(nextP.p)-getFitness(p.p);
+        if(df<0)p.v = v;
+        else if(exp(-df/temp)>rand01())p.v = v;
+
+    }
+    /** 更新路径 */
+    void updateP(Particle &p){
+        for(auto i:p.v)swap(p.p[i.first],p.p[i.second]);
+    }
+    /** 求解 */
+    void calc(){
+        for(int i=0;i<gTimes;++i){
+            for(auto j:particles){
+                updateV(j);
+                updateP(j);
+                j.f = getFitness(j.p);
+                if(j.f<j.bestF)j.bestP = j.p,j.bestF = j.f;
+                if(j.f< gBestF) gBestP = j.p, gBestF = j.f;
+            }
+            temp *= dt;
+            if(temp<1e-16)break;
+        }
+        cout<<"最短距离和:"<<gBestF<<"\n最短路径:";
+        for(auto i:gBestP)cout<<i<<" ";cout<<"\n";
+    }
+};
+int main(){
+    srand(time(NULL));
+    PSO a;
+    a.calc();
+    return 0;
+}
